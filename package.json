@@ -1,0 +1,46 @@
+{
+  "name": "avalanchejs-test",
+  "version": "0.0.1",
+  "description": "this is used to test avalanchejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test",
+    "create_multisig": "npx ts-node src/create_multisig.ts",
+    "send_multisig": "npx ts-node src/send_multisig.ts"
+  },
+  "author": "Santiago Jose Maria",
+  "license": "ISC",
+  "dependencies": {
+    "avalanche": "3.6.1",
+    "typescript": "^4.3.2"
+  },
+  "devDependencies": {
+    "@types/elliptic": "^6.4.12",
+    "@types/libsodium-wrappers": "^0.7.7",
+    "@types/mocha": "^5.2.6",
+    "@types/node": "^11.13.22",
+    "@types/sinon": "^7.5.0",
+    "awesome-typescript-loader": "^5.2.1",
+    "eslint-plugin-import": "^2.19.1",
+    "eslint-plugin-jsdoc": "^33.0.0",
+    "glob": "^7.1.3",
+    "lint-staged": "^8.1.4",
+    "mocha": "^6.1.4",
+    "mochawesome": "^4.1.0",
+    "nyc": "^15.0.0",
+    "prettier": "^1.19.1",
+    "should": "^13.1.3",
+    "sinon": "^7.5.0",
+    "terser-webpack-plugin": "^1.2.3",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.2.3"
+  },
+  "nyc": {
+    "extension": [
+      ".ts"
+    ],
+    "include": [
+      "src/**/*.ts"
+    ]
+  }
+}
