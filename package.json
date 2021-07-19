@@ -10,9 +10,17 @@
   },
   "author": "Santiago Jose Maria",
   "license": "ISC",
+  "contributors": [
+    "Gabriel Cardona <gabriel@avalabs.org>",
+    "Paul Kim <paul.kim@avalabs.org>"
+  ],
   "dependencies": {
     "avalanche": "3.6.1",
     "typescript": "^4.3.2"
+  },
+  "engines": {
+    "node": ">=14.17.0",
+    "npm": ">=6.14.11"
   },
   "devDependencies": {
     "@types/elliptic": "^6.4.12",
