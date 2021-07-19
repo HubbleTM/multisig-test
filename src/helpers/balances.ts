@@ -1,13 +1,14 @@
-import { client } from './client';
+import { AVMAPI } from "avalanche/dist/apis/avm"
+import { client } from "./client"
 
-export async function getXChainBalance(address: string) {
-  const xChain = client.XChain();
-
-  const balances = await xChain.getAllBalances(address);
+export async function getXChainBalance(address: string): Promise<object[] | undefined> {
+  const xChain: AVMAPI = client.XChain()
+  const balances: object[] = await xChain.getAllBalances(address)
+  console.log(balances)
 
   if (balances.length > 0) {
-    return balances;
+    return balances
   } else {
-    return undefined;
+    return undefined
   }
 }

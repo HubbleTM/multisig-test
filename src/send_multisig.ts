@@ -1,126 +1,85 @@
-import { client } from './helpers/client';
-import { avm, utils, BinTools, BN, Buffer } from 'avalanche';
+import { client } from "./helpers/client"
+import { utils, BinTools, BN, Buffer } from "avalanche"
+import { MULTISIG, NETWORK_ID } from "./resources/constants"
+import { AmountOutput, AVMAPI, BaseTx, KeyChain, SECPTransferInput, SECPTransferOutput, TransferableInput, TransferableOutput, Tx, UnsignedTx, UTXO, UTXOSet } from "avalanche/dist/apis/avm"
+import { UTXOResponse } from "./helpers/interfaces"
 
-import { MULTISIG_ACCOUNT_1, MULTISIG_ACCOUNT_2 } from './resources/accounts';
+const multisig1: any = require("./account1.json")
+const SENDER: any = multisig1
+const xChain: AVMAPI = client.XChain()
+const bintools: BinTools = BinTools.getInstance()
+const xKeychain: KeyChain = xChain.keyChain()
 
-import { getXChainBalance } from './helpers/balances';
+xKeychain.importKey(SENDER.owner_1.privateKey)
+xKeychain.importKey(SENDER.owner_3.privateKey)
+xKeychain.importKey(SENDER.owner_2.privateKey)
 
-import { NETWORK_ID } from './resources/constants';
+const mainAddresses: Buffer[] = xChain.keyChain().getAddresses()
+const mainAddressStrings: string[] = xChain.keyChain().getAddressStrings()
+const blockchainID: string = utils.Defaults.network[NETWORK_ID].X.blockchainID
+const avaxAssetID: string = utils.Defaults.network[NETWORK_ID].X.avaxAssetID
+const avaxAssetIDBuf: Buffer = bintools.cb58Decode(avaxAssetID)
+const outputs: TransferableOutput[] = []
+const inputs: TransferableInput[] = []
+const fee: BN = xChain.getDefaultTxFee()
+const locktime: BN = new BN(0)
+const threshold: number = 1
+const memo: Buffer = Buffer.from("AVM Transfer from multisig output")
 
-const multisig1 = require('./account1.json');
-//const SENDER = MULTISIG_ACCOUNT_1;
-const SENDER = multisig1;
-const RECEIVER = MULTISIG_ACCOUNT_2;
+const main = async (): Promise<any> => {
+  const utxoResponse: UTXOResponse = await xChain.getUTXOs(mainAddressStrings)
+  const utxoSet: UTXOSet = utxoResponse.utxos
+  const utxos: UTXO[] = utxoSet.getAllUTXOs()
+  const amountOutput = utxos[0].getOutput() as AmountOutput
+  const balance: string = amountOutput.getAmount().toString()
 
-const xchain = client.XChain();
-const bintools = BinTools.getInstance();
-const xKeychain = xchain.keyChain();
-
-xKeychain.importKey(SENDER.owner_1.privateKey);
-xKeychain.importKey(SENDER.owner_2.privateKey);
-xKeychain.importKey(SENDER.owner_3.privateKey);
-
-const mainAddresses = xchain.keyChain().getAddresses();
-const mainAddressStrings = xchain.keyChain().getAddressStrings();
-
-// blockchain id was incorrect for me at least
-
-// @ts-ignore
-// const blockchainID = utils.Defaults.network[NETWORK_ID].X.blockchainID;
-const blockchainID = '2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed';
-// @ts-ignore
-const avaxAssetID = utils.Defaults.network[NETWORK_ID].X.avaxAssetID;
-const avaxAssetIDBuf = bintools.cb58Decode(avaxAssetID);
-const outputs: avm.TransferableOutput[] = [];
-const inputs: avm.TransferableInput[] = [];
-const fee = xchain.getDefaultTxFee();
-const locktime = new BN(0);
-const memo = Buffer.from('AVM Transfer from multisig account');
-
-const main = async function() {
-  console.log(`Transfer from ${SENDER.address} to ${RECEIVER.address}
-  Sender Balance:   ${await getXChainBalance(SENDER.address)}
-  Receiver Balance: ${await getXChainBalance(RECEIVER.address)}`);
-
-  console.log('mainAddressStrings', mainAddressStrings);
-
-  const { balance }: any = await xchain.getBalance(SENDER.address, 'AVAX');
-  console.log('balance', balance);
-
-  // const getBalanceResponse = await xchain.getBalance(
-  //   mainAddressStrings[0],
-  //   avaxAssetID
-  // );
-
-  // @ts-ignore
-  // const balance = new BN(getBalanceResponse['balance']);
-  const secpTransferOutput = new avm.SECPTransferOutput(
+  const secpTransferOutput: SECPTransferOutput = new SECPTransferOutput(
     new BN(balance).sub(fee),
     [mainAddresses[0]],
     locktime,
-    1
-  ); //threshold = 1
+    threshold
+  )
 
-  const transferableOutput = new avm.TransferableOutput(
+  const transferableOutput: TransferableOutput = new TransferableOutput(
     avaxAssetIDBuf,
     secpTransferOutput
-  );
-  outputs.push(transferableOutput);
+  )
+  outputs.push(transferableOutput)
 
-  const avmUTXOResponse = await xchain.getUTXOs(mainAddressStrings);
-
-  const utxoSet = avmUTXOResponse.utxos;
-  const utxos = utxoSet.getAllUTXOs();
-  utxos.forEach((utxo) => {
-    const amountOutput = utxo.getOutput();
-    console.log('each output', amountOutput);
-
-    // @ts-ignore
-    const amt = amountOutput.getAmount().clone();
-    const txid = utxo.getTxID();
-    const outputidx = utxo.getOutputIdx();
-
-    const secpTransferInput = new avm.SECPTransferInput(amt);
-
-    mainAddresses.forEach((address, index) => {
-      if (index < 3) {
-        secpTransferInput.addSignatureIdx(index, address);
+  mainAddresses.sort()
+  utxos.forEach((utxo: UTXO): void => {
+    const amountOutput = utxo.getOutput() as AmountOutput
+    const amt: BN = amountOutput.getAmount().clone()
+    const txid: Buffer = utxo.getTxID()
+    const outputidx: Buffer = utxo.getOutputIdx()
+    const secpTransferInput: SECPTransferInput = new SECPTransferInput(amt)
+    mainAddresses.forEach((address: Buffer, index: number): void => {
+      if (index < MULTISIG.MIN_SIGNATURES) {
+        secpTransferInput.addSignatureIdx(index, address)
       }
-    });
+    })
 
-    const input = new avm.TransferableInput(
+    const transferableInput: TransferableInput = new TransferableInput(
       txid,
       outputidx,
       avaxAssetIDBuf,
       secpTransferInput
-    );
-    inputs.push(input);
-  });
+    )
+    inputs.push(transferableInput)
+  })
 
-  //  const networkId = await client.Info().getNetworkID();
-  const networkId = 12345;
-
-  const baseTx = new avm.BaseTx(
-    networkId,
+  const baseTx: BaseTx = new BaseTx(
+    NETWORK_ID,
     bintools.cb58Decode(blockchainID),
     outputs,
     inputs,
     memo
-  );
+  )
 
-  console.log('outputs', outputs);
+  const unsignedTx: UnsignedTx = new UnsignedTx(baseTx)
+  const tx: Tx = unsignedTx.sign(xKeychain)
+  const txid: string = await xChain.issueTx(tx)
+  console.log(`Success! TXID: ${txid}`)
+}
 
-  const unsignedTx = new avm.UnsignedTx(baseTx);
-  console.log('test', await unsignedTx.getOutputTotal(avaxAssetIDBuf));
-
-  const tx = unsignedTx.sign(xKeychain);
-
-  console.log('tx', tx);
-
-  const txid = await xchain.issueTx(tx);
-  console.log(`Success! TXID: ${txid}`);
-  console.log(`Sender Balance:   ${await getXChainBalance(SENDER.address)}
-  Receiver Balance: ${await getXChainBalance(RECEIVER.address)}`);
-};
-
-main();
+main()

@@ -1,158 +1,149 @@
 //create_multisig_wallet.js
-import { client } from './helpers/client';
-import { getXChainFees } from './helpers/fees';
-import { create_new_account } from './helpers/accounts';
-import { BN, BinTools, avm, utils, Buffer } from 'avalanche';
-import { ASSETS, MULTISIG, NETWORK_ID } from './resources/constants';
-import { sleep } from './helpers/sleep';
-import { getXChainBalance } from './helpers/balances';
-import fs from 'fs';
+import { client } from "./helpers/client"
+import { getXChainFees } from "./helpers/fees"
+import { create_new_account } from "./helpers/accounts"
+import { BN, BinTools, Buffer } from "avalanche"
+import { ASSETS, BLOCKCHAIN_ID, MULTISIG, NETWORK_ID } from "./resources/constants"
+import { sleep } from "./helpers/sleep"
+import { getXChainBalance } from "./helpers/balances"
+import fs from "fs"
+import { AmountOutput, AVMAPI, BaseTx, KeyChain, KeyPair, SECPTransferInput, SECPTransferOutput, TransferableInput, TransferableOutput, Tx, UnsignedTx, UTXO, UTXOSet } from "avalanche/dist/apis/avm"
+import { Account, NewAccount, UTXOResponse } from "./helpers/interfaces"
 
-const binTools = BinTools.getInstance();
+export interface AssetDetails {
+  name: string
+  symbol: string
+  assetID: Buffer
+  denomination: number
+}
 
-async function main() {
+const binTools: BinTools = BinTools.getInstance()
+
+const main = async (): Promise<any> => {
   // Initialize chain components
-  const chain = client.XChain();
-  const keychain = chain.keyChain();
-  const fee = new BN(getXChainFees().default);
-  const locktime = new BN(0);
-  const assetIdBuf = binTools.cb58Decode(ASSETS.AVAX);
+  const chain: AVMAPI = client.XChain()
+  const keychain: KeyChain = chain.keyChain()
+  const fee: BN = new BN(getXChainFees().default)
+  const locktime: BN = new BN(0)
+  const threshold: number = MULTISIG.MIN_SIGNATURES
+  const assetIdBuf: Buffer = binTools.cb58Decode(ASSETS.AVAX)
 
-  const outputs = [];
-  const inputs: avm.TransferableInput[] = [];
-  const memo = Buffer.from('Multisig address creation');
+  const outputs: TransferableOutput[] = []
+  const inputs: TransferableInput[] = []
+  const memo: Buffer = Buffer.from("Multisig address creation")
 
-  // @ts-ignore
-  // /  const blockchainID = utils.Defaults.network[NETWORK_ID].X.blockchainID;
-  const blockchainID = '2eNy1mUFdmaxXNj1eQHUe7Np4gju9sJsEtWQ4MX3ToiNKuADed';
-  console.log('blockchainID', blockchainID);
+  const genesisPk: string = "PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN"
 
-  const owner_1 = await create_new_account();
-  const owner_2 = await create_new_account();
-  const owner_3 = await create_new_account();
+  keychain.importKey(genesisPk)
+  const address: Buffer = keychain.getAddresses()[0]
+  const addressStr: string = keychain.getAddressStrings()[0]
+  const keyPair: KeyPair = keychain.getKey(address)
 
-  const genesisPk = `PrivateKey-ewoqjP7PxY4yr3iLTpLisriqt94hdyDFNgchSxGGztUrTXtNN`;
+  const whale: NewAccount = {
+    publicKey: keyPair.getPublicKeyString(),
+    privateKey: keyPair.getPrivateKeyString(),
+    address: addressStr
 
-  keychain.importKey(owner_1.privateKey);
-  keychain.importKey(owner_2.privateKey);
-  keychain.importKey(owner_3.privateKey);
+  }
+  const owner_1: NewAccount = await create_new_account()
+  const owner_2: NewAccount = await create_new_account()
 
-  const mainAddresses = keychain.getAddresses();
-  const mainAddressesString = keychain.getAddressStrings();
+  const mainAddresses: Buffer[] = keychain.getAddresses()
+  const mainAddressesString: string[] = keychain.getAddressStrings()
 
-  const getBalanceResponse: any = await chain.getBalance(
-    mainAddressesString[0],
-    ASSETS.AVAX
-  );
+  // const getBalanceResponse: object = await chain.getBalance(
+  //   mainAddressesString[0],
+  //   ASSETS.AVAX
+  // )
 
-  const assetDetails = await chain.getAssetDescription(ASSETS.AVAX);
-
-  let allBalances = await getXChainBalance(mainAddressesString[0]);
+  const assetDetails = await chain.getAssetDescription(ASSETS.AVAX) as AssetDetails
+  let allBalances: any = await getXChainBalance(mainAddressesString[0])
 
   if (!allBalances || allBalances.length == 0) {
-    console.log('Address does not have any associated balances yet.');
-    console.log(
-      '=============================================================='
-    );
-    console.log(
-      'Visit https://faucet.avax-test.network/ to pre-fund your address.'
-    );
-    console.log(
-      '=============================================================='
-    );
-    console.log(`Wallet Address: ${mainAddressesString[0]}`);
+    console.log("Address does not have any associated balances yet.")
+    console.log("==============================================================")
+    console.log("Visit https://faucet.avax-test.network/ to pre-fund your address.")
+    console.log("==============================================================")
+    console.log(`Wallet Address: ${mainAddressesString[0]}`)
 
     while (!allBalances || allBalances.length == 0) {
-      allBalances = await getXChainBalance(mainAddressesString[0]);
-      await sleep(2000);
+      allBalances = await getXChainBalance(mainAddressesString[0])
+      await sleep(2000)
     }
   }
 
-  // @ts-ignore
-  const assetBalances = allBalances.find((b) => b.asset == assetDetails.symbol);
-  // @ts-ignore
-  const balance = new BN(assetBalances.balance);
+  const assetBalances: any = allBalances.find((b: any) => b.asset == assetDetails.symbol)
+  const balance: BN = new BN(assetBalances["balance"])
 
-  const secpTransferOutput = new avm.SECPTransferOutput(
+  const secpTransferOutput: SECPTransferOutput = new SECPTransferOutput(
     balance.sub(fee),
     mainAddresses,
     locktime,
-    MULTISIG.MIN_SIGNATURES
-  );
+    threshold
+  )
 
-  const transferableOutput = new avm.TransferableOutput(
+  const transferableOutput: TransferableOutput = new TransferableOutput(
     assetIdBuf,
     secpTransferOutput
-  );
-  outputs.push(transferableOutput);
+  )
+  outputs.push(transferableOutput)
+  outputs.sort()
 
-  const avmUTXOResponse = await chain.getUTXOs(mainAddressesString);
-  console.log('avmUTXOResponse', avmUTXOResponse);
+  const utxoResponse: UTXOResponse = await chain.getUTXOs(mainAddressesString)
+  const utxoSet: UTXOSet = utxoResponse.utxos
+  const utxos: UTXO[] = utxoSet.getAllUTXOs()
 
-  const utxoSet = avmUTXOResponse.utxos;
-  console.log('utxoSet', utxoSet);
+  utxos.forEach((utxo: UTXO): void => {
+    const amountOutput = utxo.getOutput() as AmountOutput
+    const amt = amountOutput.getAmount().clone()
+    const txid: Buffer = utxo.getTxID()
+    const outputidx: Buffer = utxo.getOutputIdx()
+    const secpTransferInput: SECPTransferInput = new SECPTransferInput(amt)
+    secpTransferInput.addSignatureIdx(0, mainAddresses[0])
 
-  const utxos = utxoSet.getAllUTXOs();
-  console.log('utxos', utxos);
-
-  utxos.forEach((utxo) => {
-    const amountOutput = utxo.getOutput();
-    // @ts-ignore
-    const amt = amountOutput.getAmount().clone();
-    const txid = utxo.getTxID();
-    const outputidx = utxo.getOutputIdx();
-
-    const secpTransferInput = new avm.SECPTransferInput(amt);
-
-    secpTransferInput.addSignatureIdx(0, mainAddresses[0]);
-
-    const input = new avm.TransferableInput(
+    const input: TransferableInput = new TransferableInput(
       txid,
       outputidx,
       assetIdBuf,
       secpTransferInput
-    );
-    inputs.push(input);
-  });
+    )
+    inputs.push(input)
+  })
 
-  //  const networkId = await client.Info().getNetworkID();
-
-  const networkId = 12345;
-
-  const baseTx = new avm.BaseTx(
-    networkId,
-    binTools.cb58Decode(blockchainID),
+  const baseTx: BaseTx = new BaseTx(
+    NETWORK_ID,
+    binTools.cb58Decode(BLOCKCHAIN_ID),
     outputs,
     inputs,
     memo
-  );
+  )
 
-  const account = {
+  const account: Account = {
     address: mainAddressesString[0],
-    addressBytes: Buffer.from(mainAddresses[0]).toString('hex'),
-    owner_1: owner_1,
-    owner_2: owner_2,
-    owner_3: owner_3,
-  };
+    addressBytes: Buffer.from(mainAddresses[0]).toString("hex"),
+    owner_1: whale,
+    owner_2: owner_1,
+    owner_3: owner_2
+  }
 
-  const unsignedTx = new avm.UnsignedTx(baseTx);
-  const tx = unsignedTx.sign(keychain);
-  const txid = await chain.issueTx(tx);
-  console.log(`Success! TXID: ${txid}`);
-  console.log(`Account Data: ${JSON.stringify(account, null, 2)}`);
+  const unsignedTx: UnsignedTx = new UnsignedTx(baseTx)
+  const tx: Tx = unsignedTx.sign(keychain)
+  const txid: string = await chain.issueTx(tx)
+  console.log(`Success! TXID: ${txid}`)
+  console.log(`Account Data: ${JSON.stringify(account, null, 2)}`)
 
-  const multiSigJson = JSON.stringify(account);
+  const multiSigJson: string = JSON.stringify(account)
 
-  fs.writeFile('account1.json', multiSigJson, function(err) {
+  fs.writeFile("src/account1.json", multiSigJson, (err: any) => {
     if (err) {
-      console.error(err);
+      console.error(err)
     } else {
-      console.log('output.json has been saved with the user data');
+      console.log("account1.json has been saved with the user data")
     }
-  });
+  })
 }
 
-main().catch((err) => {
-  console.log('We have encountered an error!');
-  console.error(err);
-});
+main().catch((err: any) => {
+  console.log("We have encountered an error!")
+  console.error(err)
+})

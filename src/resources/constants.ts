@@ -1,16 +1,16 @@
 //constants.js
 // Avalanche Assets
-export const ASSETS = {
-  //  AVAX: 'U8iRqJoiJm8xZHAacmvYyZVwqQx6uDNtQeP3CQ6fcgQk3JqnK'
-  AVAX: '2fombhL7aGPwj3KH4bfrmJwW6PVnMobf9Y2fn9GwxiAAJyFDbe',
-};
+import { utils } from "avalanche"
+import { Assets, Multisig } from "../helpers/interfaces"
+export const NETWORK_ID = 12345
+export const BLOCKCHAIN_ID: string = utils.Defaults.network[NETWORK_ID].X.blockchainID
+const avaxAssetID: string = utils.Defaults.network[NETWORK_ID].X.avaxAssetID
+export const ASSETS: Assets = {
+  AVAX: avaxAssetID
+}
 
 // Multisig Accounts
-export const MULTISIG = {
-  MIN_SIGNATURES: 2,
-};
+export const MULTISIG: Multisig = {
+  MIN_SIGNATURES: 2
+}
 
-// Node data
-export const NODE_URL = 'https://api.avax-test.network/ext/bc/C/rpc';
-export const NETWORK_ID = 5;
-export const NETWORK_NAME = 'fuji';
